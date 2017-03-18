@@ -200,7 +200,11 @@ static void ICACHE_FLASH_ATTR receive_callback(void * arg, char * buf, unsigned 
 	request_args * req = (request_args *)conn->reverse;
 
 	if (req->buffer == NULL) {
-		return;
+		if (req->secure)
+			espconn_secure_disconnect(conn);
+		else
+			espconn_disconnect(conn);
+		return; // The disconnect callback will be called.
 	}
 
 	// Let's do the equivalent of a realloc().
@@ -354,7 +358,7 @@ static void ICACHE_FLASH_ATTR dns_callback(const char * hostname, ip_addr_t * ad
 	if (addr == NULL) {
 		os_printf("DNS failed for %s\n", hostname);
 		if (req->user_callback != NULL) {
-			req->user_callback("", -1, "", 0);
+			req->user_callback("", HTTP_STATUS_GENERIC_DNS, "", 0);
 		}
 		os_free(req->buffer);
 		os_free(req->post_data);
@@ -432,7 +436,7 @@ void ICACHE_FLASH_ATTR http_raw_request(const char * hostname, int port, bool se
  * <host> can be a hostname or an IP address
  * <port> is optional
  */
-void ICACHE_FLASH_ATTR http_post(const char * url, const char * post_data, const char * headers, http_callback user_callback)
+int ICACHE_FLASH_ATTR http_post(const char * url, const char * post_data, const char * headers, http_callback user_callback)
 {
 	// FIXME: handle HTTP auth with http://user:pass@host/
 	// FIXME: get rid of the #anchor part if present.
@@ -452,7 +456,7 @@ void ICACHE_FLASH_ATTR http_post(const char * url, const char * post_data, const
 		url += strlen("https://"); // Get rid of the protocol.
 	} else {
 		os_printf("URL is not HTTP or HTTPS %s\n", url);
-		return;
+		return HTTP_STATUS_GENERIC_PROTO;
 	}
 
 	char * path = os_strchr(url, '/');
@@ -473,7 +477,7 @@ void ICACHE_FLASH_ATTR http_post(const char * url, const char * post_data, const
 		port = atoi(colon + 1);
 		if (port == 0) {
 			os_printf("Port error %s\n", url);
-			return;
+			return HTTP_STATUS_GENERIC_PORT;
 		}
 
 		os_memcpy(hostname, url, colon - url);
@@ -489,17 +493,19 @@ void ICACHE_FLASH_ATTR http_post(const char * url, const char * post_data, const
 	PRINTF("port=%d\n", port);
 	PRINTF("path=%s\n", path);
 	http_raw_request(hostname, port, secure, path, post_data, headers, user_callback);
+
+	return 0;
 }
 
-void ICACHE_FLASH_ATTR http_get(const char * url, const char * headers, http_callback user_callback)
+int ICACHE_FLASH_ATTR http_get(const char * url, const char * headers, http_callback user_callback)
 {
-	http_post(url, NULL, headers, user_callback);
+	return http_post(url, NULL, headers, user_callback);
 }
 
 void ICACHE_FLASH_ATTR http_callback_example(char * response_body, int http_status, char * response_headers, int body_size)
 {
 	os_printf("http_status=%d\n", http_status);
-	if (http_status != HTTP_STATUS_GENERIC_ERROR) {
+	if (!HTTP_STATUS_IS_GENERIC(http_status)) {
 		os_printf("strlen(headers)=%d\n", strlen(response_headers));
 		os_printf("body_size=%d\n", body_size);
 		os_printf("body=%s<EOF>\n", response_body); // FIXME: this does not handle binary data.

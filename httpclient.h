@@ -12,7 +12,12 @@
 
 #include <espmissingincludes.h> // This can remove some warnings depending on your project setup. It is safe to remove this line.
 
+#define HTTP_STATUS_IS_GENERIC(x)  (x<0)
 #define HTTP_STATUS_GENERIC_ERROR  -1   // In case of TCP or DNS error the callback is called with this status.
+#define HTTP_STATUS_GENERIC_PROTO  -2   // protocol is not http or https
+#define HTTP_STATUS_GENERIC_PORT   -3   // invalid port specification
+#define HTTP_STATUS_GENERIC_DNS    -4   // DNS lookup error
+#define HTTP_STATUS_GENERIC_NOMEM  -5   // out of memory receiving data
 #define BUFFER_SIZE_MAX            5000 // Size of http responses that will cause an error.
 
 /*
@@ -29,7 +34,7 @@ typedef void (* http_callback)(char * response_body, int http_status, char * res
  * Try:
  * http_get("http://wtfismyip.com/text", http_callback_example);
  */
-void ICACHE_FLASH_ATTR http_get(const char * url, const char * headers, http_callback user_callback);
+int ICACHE_FLASH_ATTR http_get(const char * url, const char * headers, http_callback user_callback);
 
 /*
  * Post data to a web form.
@@ -37,7 +42,7 @@ void ICACHE_FLASH_ATTR http_get(const char * url, const char * headers, http_cal
  * Try:
  * http_post("http://httpbin.org/post", "first_word=hello&second_word=world", http_callback_example);
  */
-void ICACHE_FLASH_ATTR http_post(const char * url, const char * post_data, const char * headers, http_callback user_callback);
+int ICACHE_FLASH_ATTR http_post(const char * url, const char * post_data, const char * headers, http_callback user_callback);
 
 /*
  * Call this function to skip URL parsing if the arguments are already in separate variables.
